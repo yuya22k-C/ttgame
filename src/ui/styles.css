@@ -1,0 +1,114 @@
+/* ピクセルアートを綺麗に拡大表示するための基本設定 */
+:root {
+  --bg: #1f1d22;
+  --hud-bg: #2a2630;
+  --hud-fg: #f4ecd8;
+  --accent: #f0c440;
+  --menu-bg: #3a3340;
+  --menu-btn: #5a4f60;
+  --menu-btn-active: #7a6a82;
+  --border: #1a1620;
+}
+
+* {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+html,
+body {
+  height: 100%;
+  background: var(--bg);
+  color: var(--hud-fg);
+  font-family:
+    "ヒラギノ角ゴ ProN", "Hiragino Kaku Gothic ProN", "Yu Gothic UI", "Meiryo", system-ui,
+    sans-serif;
+  font-size: 14px;
+  user-select: none;
+  -webkit-user-select: none;
+  -webkit-tap-highlight-color: transparent;
+  overflow: hidden;
+}
+
+#app {
+  display: flex;
+  flex-direction: column;
+  height: 100vh;
+  height: 100dvh;
+}
+
+/* ---- HUD (上部ステータスバー) ----------------------------------------- */
+.hud {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  background: var(--hud-bg);
+  border-bottom: 2px solid var(--border);
+  padding: 8px 12px;
+  font-weight: 600;
+}
+
+.hud-left,
+.hud-center,
+.hud-right {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.hud-label {
+  font-size: 0.78em;
+  opacity: 0.7;
+}
+
+.hud-value {
+  font-size: 1em;
+  color: var(--accent);
+  font-variant-numeric: tabular-nums;
+}
+
+/* ---- Stage (PixiJS Canvas を入れる領域) -------------------------------- */
+.stage {
+  flex: 1;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  background: #2c4a2c; /* 仮の屋外地面色 */
+  overflow: hidden;
+  position: relative;
+}
+
+.stage canvas {
+  image-rendering: pixelated;
+  image-rendering: crisp-edges;
+  max-width: 100%;
+  max-height: 100%;
+}
+
+/* ---- Menu (下部操作ボタン) ------------------------------------------ */
+.menu {
+  display: flex;
+  background: var(--menu-bg);
+  border-top: 2px solid var(--border);
+  padding: 6px;
+  gap: 6px;
+}
+
+.menu-btn {
+  flex: 1;
+  padding: 10px 6px;
+  font-size: 0.95em;
+  font-weight: 700;
+  color: var(--hud-fg);
+  background: var(--menu-btn);
+  border: 2px solid var(--border);
+  border-radius: 4px;
+  cursor: pointer;
+  font-family: inherit;
+}
+
+.menu-btn:active {
+  background: var(--menu-btn-active);
+  transform: translateY(1px);
+}
