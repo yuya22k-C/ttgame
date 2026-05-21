@@ -3,13 +3,16 @@
 要件定義 11.1 の方針:
 - 16×24 px / 4方向 (down/up/left/right)
 - 麦わら帽子 + オーバーオールのカイロ風農夫
-- right は left のミラー反転で生成 (描画コストとイメージの一貫性)
+- 各方向に 3フレーム (idle / walk1 / walk2) — 2フレーム歩行サイクル
+- right は left のミラー反転で生成
 
 実行: python3 scripts/gen_player.py
 出力:
-  assets/sprites/player/{down,up,left,right}.png
-  assets/sprites/player/sheet.png  (4方向横並び)
-  assets/sprites/player/preview.png (拡大版)
+  assets/sprites/player/{down,up,left,right}.png            (=idle, 後方互換)
+  assets/sprites/player/{dir}_{idle,walk1,walk2}.png        (個別フレーム)
+  assets/sprites/player/{dir}_walk.png                       (1方向3フレームの横シート)
+  assets/sprites/player/sheet.png                            (4方向×3フレームの全シート)
+  assets/sprites/player/preview.png                          (拡大プレビュー)
 """
 
 from __future__ import annotations
@@ -124,6 +127,50 @@ LEFT = [
 ]
 
 
+# ============================================================================
+# 歩行フレーム生成
+# ============================================================================
+# 戦略: 頭・胴体 (rows 0-20) はそのまま、脚部 (rows 21-23) のみ書き換える.
+#       walk1 = 右足を 1px 持ち上げ, walk2 = 左足を 1px 持ち上げ.
+#       LEFT/RIGHT は横向きなので末端 (row 23) のみ脚の前後を入れ替える.
+
+
+def with_legs(base: list[str], legs: list[str], start_row: int) -> list[str]:
+    """`base` の `start_row` から `legs` で置き換えた新リストを返す."""
+    return base[:start_row] + legs + base[start_row + len(legs):]
+
+
+# DOWN/UP の脚部入れ替え (rows 21-23)
+DOWN_UP_WALK1_LEGS = [
+    "...oPPPoPPPo....",  # row 21: ズボンを左右に分割 (中央に縫い目)
+    "...oKKKoKKKo....",  # row 22: ブーツ上端も分割
+    "...oKkKo........",  # row 23: 左足のみ接地 (右足は1px上=row 22終点)
+]
+DOWN_UP_WALK2_LEGS = [
+    "...oPPPoPPPo....",
+    "...oKKKoKKKo....",
+    "........oKKko...",  # 右足のみ接地
+]
+
+# LEFT の脚部入れ替え (row 23 のみ)
+LEFT_WALK1_LEGS = ["..oKkK.........."]   # 後ろ足 (奥) を持ち上げ → 前足のみ
+LEFT_WALK2_LEGS = ["....oKKko......."]   # 前足を持ち上げ → 後ろ足のみ (1px後ろにずらす)
+
+
+def make_walks(base: list[str], dirname: str) -> tuple[list[str], list[str]]:
+    if dirname in ("down", "up"):
+        return (
+            with_legs(base, DOWN_UP_WALK1_LEGS, 21),
+            with_legs(base, DOWN_UP_WALK2_LEGS, 21),
+        )
+    if dirname == "left":
+        return (
+            with_legs(base, LEFT_WALK1_LEGS, 23),
+            with_legs(base, LEFT_WALK2_LEGS, 23),
+        )
+    raise ValueError(dirname)
+
+
 def render(rows: list[str]) -> Image.Image:
     img = Image.new("RGBA", (W, H), (0, 0, 0, 0))
     for y, row in enumerate(rows):
@@ -151,32 +198,70 @@ def gen_preview(images: list[Image.Image], labels: list[str]) -> Image.Image:
     return out
 
 
+def validate(rows: list[str], name: str) -> None:
+    assert len(rows) == H, f"{name}: rows={len(rows)} (need {H})"
+    for i, r in enumerate(rows):
+        assert len(r) == W, f"{name}[{i}]: width={len(r)} (need {W}): {r!r}"
+
+
 def main() -> None:
     out_dir = os.path.join(os.path.dirname(__file__), "..", "assets", "sprites", "player")
     out_dir = os.path.normpath(out_dir)
     os.makedirs(out_dir, exist_ok=True)
 
-    # 行数検証
-    for name, rows in [("DOWN", DOWN), ("UP", UP), ("LEFT", LEFT)]:
-        assert len(rows) == H, f"{name} expected {H} rows, got {len(rows)}"
-        for i, r in enumerate(rows):
-            assert len(r) == W, f"{name}[{i}] expected width {W}, got {len(r)}: {r!r}"
+    bases = {"down": DOWN, "up": UP, "left": LEFT}
+    for name, rows in bases.items():
+        validate(rows, name)
 
-    down_img = render(DOWN)
-    up_img = render(UP)
-    left_img = render(LEFT)
-    right_img = left_img.transpose(Image.FLIP_LEFT_RIGHT)
+    # 各方向の (idle, walk1, walk2) を作成
+    frames: dict[str, list[Image.Image]] = {}
+    for dirname, base in bases.items():
+        idle_rows = base
+        walk1_rows, walk2_rows = make_walks(base, dirname)
+        for label, rows in [("idle", idle_rows), ("walk1", walk1_rows), ("walk2", walk2_rows)]:
+            validate(rows, f"{dirname}_{label}")
+        frames[dirname] = [render(idle_rows), render(walk1_rows), render(walk2_rows)]
 
-    for name, img in [("down.png", down_img), ("up.png", up_img), ("left.png", left_img), ("right.png", right_img)]:
-        img.save(os.path.join(out_dir, name), "PNG")
-        print(f"wrote {os.path.join(out_dir, name)}")
+    # right は left のミラー
+    frames["right"] = [img.transpose(Image.FLIP_LEFT_RIGHT) for img in frames["left"]]
 
-    sheet = gen_sheet([down_img, up_img, left_img, right_img])
-    sheet.save(os.path.join(out_dir, "sheet.png"), "PNG")
+    # 個別 PNG 出力
+    for dirname in ("down", "up", "left", "right"):
+        idle, walk1, walk2 = frames[dirname]
+        for label, img in [("idle", idle), ("walk1", walk1), ("walk2", walk2)]:
+            path = os.path.join(out_dir, f"{dirname}_{label}.png")
+            img.save(path, "PNG")
+            print(f"wrote {path}")
+        # 後方互換: {dir}.png = idle
+        idle.save(os.path.join(out_dir, f"{dirname}.png"), "PNG")
+        # 1方向 3フレームの横シート
+        per_dir = Image.new("RGBA", (W * 3, H), (0, 0, 0, 0))
+        for i, img in enumerate([idle, walk1, walk2]):
+            per_dir.paste(img, (i * W, 0), img)
+        per_dir.save(os.path.join(out_dir, f"{dirname}_walk.png"), "PNG")
+        print(f"wrote {os.path.join(out_dir, f'{dirname}_walk.png')}")
+
+    # 4方向×3フレームの全シート (rows=dir, cols=frame)
+    all_sheet = Image.new("RGBA", (W * 3, H * 4), (0, 0, 0, 0))
+    for r, dirname in enumerate(("down", "up", "left", "right")):
+        for c, img in enumerate(frames[dirname]):
+            all_sheet.paste(img, (c * W, r * H), img)
+    all_sheet.save(os.path.join(out_dir, "sheet.png"), "PNG")
     print(f"wrote {os.path.join(out_dir, 'sheet.png')}")
 
-    preview = gen_preview([down_img, up_img, left_img, right_img], ["down", "up", "left", "right"])
-    preview.save(os.path.join(out_dir, "preview.png"), "PNG")
+    # プレビュー: 4列(方向) × 3行(フレーム) を 5倍拡大して並べる
+    scale = 5
+    margin = 8
+    cols = 4  # 方向
+    rows_n = 3  # フレーム
+    cell_w = W * scale + margin
+    cell_h = H * scale + margin
+    out = Image.new("RGBA", (cell_w * cols + margin, cell_h * rows_n + margin), (244, 240, 232, 255))
+    for ci, dirname in enumerate(("down", "up", "left", "right")):
+        for ri, img in enumerate(frames[dirname]):
+            big = img.resize((W * scale, H * scale), Image.NEAREST)
+            out.paste(big, (margin + ci * cell_w, margin + ri * cell_h), big)
+    out.save(os.path.join(out_dir, "preview.png"), "PNG")
     print(f"wrote {os.path.join(out_dir, 'preview.png')}")
 
 
