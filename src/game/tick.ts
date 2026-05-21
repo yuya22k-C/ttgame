@@ -11,6 +11,7 @@ import {
   realMsToGameMinutes,
 } from "@/util/time";
 import type { GameState, Season } from "@/game/state";
+import { advanceFarm } from "@/game/tomato";
 
 const SEASON_ORDER: Season[] = ["spring", "summer", "autumn", "winter"];
 
@@ -79,6 +80,8 @@ export function tick(state: GameState, realDeltaMs: number, nowRealMs: number): 
   }
   const rawGameMinutes = realMsToGameMinutes(realDeltaMs) * speed;
   const gameMinutes = Math.min(rawGameMinutes, MAX_TICK_GAME_MINUTES);
+  const gameDays = gameMinutes / (HOURS_PER_DAY * MINUTES_PER_HOUR);
   const newClock = advanceClock(state.clock, gameMinutes, nowRealMs);
-  return { ...state, clock: newClock };
+  const newFarm = advanceFarm(state.farm, gameDays);
+  return { ...state, clock: newClock, farm: newFarm };
 }

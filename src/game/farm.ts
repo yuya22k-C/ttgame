@@ -1,9 +1,26 @@
 // 農園 (ハウス建設等) の純粋ロジック.
 // Pixi/DOM に依存しない. 結果は新しい GameState を返す.
 
-import { GREENHOUSE_COST, GREENHOUSE_SIZE } from "@/config/balance";
-import type { Farm, GameState, Greenhouse } from "@/game/state";
+import {
+  GREENHOUSE_COST,
+  GREENHOUSE_SIZE,
+  PLOTS_PER_GREENHOUSE,
+} from "@/config/balance";
+import type { Farm, GameState, Greenhouse, Plot } from "@/game/state";
 import { nextId } from "@/util/id";
+
+function createEmptyPlots(count: number): Plot[] {
+  const plots: Plot[] = [];
+  for (let i = 0; i < count; i += 1) {
+    plots.push({
+      id: nextId("plot"),
+      index: i,
+      waterLevel: 0,
+      fertilizerLevel: 0,
+    });
+  }
+  return plots;
+}
 
 export type Size = { w: number; h: number };
 
@@ -54,6 +71,7 @@ export function placeGreenhouse(state: GameState, gx: number, gy: number): Place
     position: { x: gx, y: gy },
     size: { w: size.w, h: size.h },
     tier: 1,
+    plots: createEmptyPlots(PLOTS_PER_GREENHOUSE),
   };
   const nextState: GameState = {
     ...state,

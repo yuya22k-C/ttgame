@@ -1,7 +1,7 @@
 // GameState — 要件定義 7.1 の中央オブジェクト.
 // M3 で Farm / Greenhouse を追加.
 
-import { GRID_H, GRID_W, INITIAL_CASH } from "@/config/balance";
+import { GRID_H, GRID_W, INITIAL_CASH, type GrowthStage } from "@/config/balance";
 
 export type Season = "spring" | "summer" | "autumn" | "winter";
 
@@ -29,11 +29,30 @@ export interface Player {
   skills: PlayerSkills;
 }
 
+export interface TomatoPlant {
+  varietyId: string;
+  stage: GrowthStage;
+  /** 現在ステージに入ってからの累積ゲーム日数 (小数). */
+  daysInStage: number;
+  /** 管理品質スコア (0-100). 水切れ/肥料切れで減衰する. */
+  careScore: number;
+}
+
+export interface Plot {
+  id: string;
+  /** 親ハウスの何番目のプロットか (0-based). */
+  index: number;
+  plant?: TomatoPlant;
+  waterLevel: number; // 0-100
+  fertilizerLevel: number; // 0-100
+}
+
 export interface Greenhouse {
   id: string;
   position: { x: number; y: number }; // グリッド座標 (左上)
   size: { w: number; h: number };
   tier: number;
+  plots: Plot[];
 }
 
 export interface Farm {

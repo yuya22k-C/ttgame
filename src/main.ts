@@ -1,24 +1,37 @@
 import { Application, Container } from "pixi.js";
-import { GREENHOUSE_COST, GRID_H, GRID_W, TILE_SIZE } from "@/config/balance";
+import {
+  FERTILIZER_COST,
+  GREENHOUSE_COST,
+  GRID_H,
+  GRID_W,
+  SEED_COST,
+  TILE_SIZE,
+} from "@/config/balance";
 import { placeGreenhouse } from "@/game/farm";
-import { createInitialState, type GameState } from "@/game/state";
+import { createInitialState, type GameState, type Greenhouse } from "@/game/state";
 import { tick } from "@/game/tick";
+import { fertilizePlot, plantSeed, waterPlot } from "@/game/tomato";
 import { FarmView } from "@/render/farmView";
+import { HouseView, type HouseAction } from "@/render/houseView";
 import { loadSprites } from "@/render/sprites";
 import { mountHud, renderHud } from "@/ui/hud";
 import { mountMenu, setBuildButtonActive } from "@/ui/menu";
 import { mountSpeedControls, refresh as refreshSpeed } from "@/ui/speed";
 import { showToast } from "@/ui/toast";
 
+type Scene = "farm" | "house";
+
 async function bootstrap(): Promise<void> {
   const stageEl = document.getElementById("stage");
   if (!(stageEl instanceof HTMLElement)) throw new Error("#stage element not found");
 
-  // Pixi セットアップ
+  const VIEW_W = GRID_W * TILE_SIZE;
+  const VIEW_H = GRID_H * TILE_SIZE;
+
   const app = new Application();
   await app.init({
-    width: GRID_W * TILE_SIZE,
-    height: GRID_H * TILE_SIZE,
+    width: VIEW_W,
+    height: VIEW_H,
     background: "#3d6b3d",
     antialias: false,
     roundPixels: true,
@@ -27,24 +40,34 @@ async function bootstrap(): Promise<void> {
   });
   stageEl.appendChild(app.canvas);
 
-  // アセット読み込み
   const sprites = await loadSprites();
 
-  // ----- State + Build mode flag --------------------------------------
   let state: GameState = createInitialState();
   state.clock.lastTickAt = performance.now();
   let buildMode = false;
+  let scene: Scene = "farm";
+  let openHouseId: string | null = null;
 
+  // ---- Pixi シーン構成 ------------------------------------------------
   const root = new Container();
   app.stage.addChild(root);
   const farmView = new FarmView({
     sprites,
-    onCellClick: (gx, gy) => handleCellClick(gx, gy),
+    onCellClick: (gx, gy) => handleFarmCellClick(gx, gy),
   });
   root.addChild(farmView.root);
   farmView.renderBuildings(state.farm);
 
-  // ----- UI 接続 -------------------------------------------------------
+  const houseView = new HouseView({
+    sprites,
+    viewWidth: VIEW_W,
+    viewHeight: VIEW_H,
+    onAction: (action, plotId) => handleHouseAction(action, plotId),
+  });
+  houseView.setVisible(false);
+  root.addChild(houseView.root);
+
+  // ---- UI 接続 -------------------------------------------------------
   mountHud();
   renderHud(state);
   mountSpeedControls(
@@ -56,52 +79,146 @@ async function bootstrap(): Promise<void> {
     },
   );
   mountMenu({
-    build: () => {
-      buildMode = !buildMode;
-      setBuildButtonActive(buildMode);
-      farmView.setBuildMode(buildMode, state);
-      if (buildMode) {
-        showToast(`空きマスをタップして配置 (¥${GREENHOUSE_COST.toLocaleString("ja-JP")})`);
-      }
-    },
+    build: () => toggleBuildMode(),
   });
 
-  function handleCellClick(gx: number, gy: number): void {
-    if (!buildMode) return;
-    const result = placeGreenhouse(state, gx, gy);
+  function toggleBuildMode(): void {
+    if (scene !== "farm") return;
+    buildMode = !buildMode;
+    setBuildButtonActive(buildMode);
+    farmView.setBuildMode(buildMode, state);
+    if (buildMode) {
+      showToast(`空きマスをタップして配置 (¥${GREENHOUSE_COST.toLocaleString("ja-JP")})`);
+    }
+  }
+
+  function handleFarmCellClick(gx: number, gy: number): void {
+    if (buildMode) {
+      const result = placeGreenhouse(state, gx, gy);
+      if (!result.ok) {
+        const msg =
+          result.reason === "not_enough_cash"
+            ? "資金が足りません"
+            : result.reason === "overlap"
+              ? "他のハウスと重なります"
+              : "ここには建てられません";
+        showToast(msg);
+        return;
+      }
+      state = result.state;
+      farmView.renderBuildings(state.farm);
+      farmView.renderOverlay(state);
+      renderHud(state);
+      showToast(`ハウスを建設しました (-¥${GREENHOUSE_COST.toLocaleString("ja-JP")})`);
+      return;
+    }
+
+    // 通常モード: クリックしたマスにあるハウスを開く
+    const hit = findGreenhouseAt(state.farm.greenhouses, gx, gy);
+    if (hit) openHouse(hit);
+  }
+
+  function openHouse(gh: Greenhouse): void {
+    scene = "house";
+    openHouseId = gh.id;
+    houseView.show(gh);
+    farmView.root.visible = false;
+  }
+
+  function closeHouse(): void {
+    scene = "farm";
+    openHouseId = null;
+    houseView.setVisible(false);
+    farmView.root.visible = true;
+  }
+
+  function handleHouseAction(action: HouseAction, plotId: string | null): void {
+    if (action === "close") {
+      closeHouse();
+      return;
+    }
+    if (!openHouseId) return;
+    if (!plotId) {
+      showToast("プロットを選択してください");
+      return;
+    }
+    let result;
+    switch (action) {
+      case "plant":
+        result = plantSeed(state, openHouseId, plotId);
+        break;
+      case "water":
+        result = waterPlot(state, openHouseId, plotId);
+        break;
+      case "fertilize":
+        result = fertilizePlot(state, openHouseId, plotId);
+        break;
+    }
     if (!result.ok) {
       const msg =
         result.reason === "not_enough_cash"
           ? "資金が足りません"
-          : result.reason === "overlap"
-            ? "他のハウスと重なります"
-            : "ここには建てられません";
+          : result.reason === "already_planted"
+            ? "すでに植えられています"
+            : result.reason === "not_planted"
+              ? "何も植えられていません"
+              : "操作できません";
       showToast(msg);
       return;
     }
     state = result.state;
-    farmView.renderBuildings(state.farm);
-    farmView.renderOverlay(state);
     renderHud(state);
-    showToast(`ハウスを建設しました (-¥${GREENHOUSE_COST.toLocaleString("ja-JP")})`);
+    refreshOpenHouse();
+    if (action === "plant") {
+      showToast(`種を撒きました (-¥${SEED_COST})`);
+    } else if (action === "fertilize") {
+      showToast(`追肥しました (-¥${FERTILIZER_COST})`);
+    }
   }
 
-  // ----- rAF ループ -----------------------------------------------------
+  function refreshOpenHouse(): void {
+    if (!openHouseId) return;
+    const gh = state.farm.greenhouses.find((g) => g.id === openHouseId);
+    if (gh) houseView.refresh(gh);
+  }
+
+  // ---- rAF ループ -----------------------------------------------------
   let last = performance.now();
   let hudAccum = 0;
+  let houseAccum = 0;
   const HUD_REFRESH_MS = 100;
+  const HOUSE_REFRESH_MS = 250;
   function loop(now: number): void {
     const delta = now - last;
     last = now;
     state = tick(state, delta, now);
     hudAccum += delta;
+    houseAccum += delta;
     if (hudAccum >= HUD_REFRESH_MS) {
       hudAccum = 0;
       renderHud(state);
     }
+    if (scene === "house" && houseAccum >= HOUSE_REFRESH_MS) {
+      houseAccum = 0;
+      refreshOpenHouse();
+    }
     requestAnimationFrame(loop);
   }
   requestAnimationFrame(loop);
+}
+
+function findGreenhouseAt(
+  greenhouses: Greenhouse[],
+  gx: number,
+  gy: number,
+): Greenhouse | undefined {
+  return greenhouses.find(
+    (gh) =>
+      gx >= gh.position.x &&
+      gx < gh.position.x + gh.size.w &&
+      gy >= gh.position.y &&
+      gy < gh.position.y + gh.size.h,
+  );
 }
 
 bootstrap().catch((err: unknown) => {
