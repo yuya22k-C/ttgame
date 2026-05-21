@@ -68,6 +68,38 @@ body {
   font-variant-numeric: tabular-nums;
 }
 
+/* ---- Speed bar ------------------------------------------------------- */
+.speed-bar {
+  display: flex;
+  justify-content: center;
+  gap: 4px;
+  padding: 4px;
+  background: #241f28;
+  border-bottom: 2px solid var(--border);
+}
+
+.speed-btn {
+  min-width: 36px;
+  padding: 4px 10px;
+  font-size: 0.85em;
+  font-weight: 700;
+  color: var(--hud-fg);
+  background: var(--menu-btn);
+  border: 2px solid var(--border);
+  border-radius: 3px;
+  cursor: pointer;
+  font-family: inherit;
+}
+
+.speed-btn--active {
+  background: var(--accent);
+  color: #1a1620;
+}
+
+.speed-btn:active {
+  transform: translateY(1px);
+}
+
 /* ---- Stage (PixiJS Canvas を入れる領域) -------------------------------- */
 .stage {
   flex: 1;

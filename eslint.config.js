@@ -19,6 +19,8 @@ export default [
         performance: "readonly",
         HTMLElement: "readonly",
         HTMLCanvasElement: "readonly",
+        HTMLButtonElement: "readonly",
+        Element: "readonly",
         navigator: "readonly",
       },
     },

@@ -1,6 +1,8 @@
 import { Application, Container, Text, TextStyle } from "pixi.js";
-import { createInitialState } from "@/game/state";
+import { createInitialState, type GameState } from "@/game/state";
+import { tick } from "@/game/tick";
 import { mountHud, renderHud } from "@/ui/hud";
+import { mountSpeedControls, refresh as refreshSpeed } from "@/ui/speed";
 
 async function bootstrap(): Promise<void> {
   const stage = document.getElementById("stage");
@@ -23,7 +25,7 @@ async function bootstrap(): Promise<void> {
   const root = new Container();
   app.stage.addChild(root);
 
-  // ----- 仮のタイトル表記 (M1 の動作確認用) ------------------------------
+  // ----- 仮の中央表示 (M3 のマップ描画で置き換える) ----------------------
   const title = new Text({
     text: "大玉トマト農園",
     style: new TextStyle({
@@ -40,10 +42,10 @@ async function bootstrap(): Promise<void> {
   root.addChild(title);
 
   const sub = new Text({
-    text: "M1: skeleton ready (Vite + TS + PixiJS)",
+    text: "M2: realtime clock running (1 real sec = 3 game min)",
     style: new TextStyle({
       fontFamily: "system-ui, sans-serif",
-      fontSize: 13,
+      fontSize: 12,
       fill: "#f0c440",
     }),
   });
@@ -51,10 +53,38 @@ async function bootstrap(): Promise<void> {
   sub.position.set(app.screen.width / 2, app.screen.height / 2 + 16);
   root.addChild(sub);
 
-  // ----- HUD を最初の GameState で描画 -----------------------------------
-  const state = createInitialState();
+  // ----- State + UI bootstrap ------------------------------------------
+  let state: GameState = createInitialState();
+  state.clock.lastTickAt = performance.now();
+
   mountHud();
   renderHud(state);
+  mountSpeedControls(
+    () => state,
+    (speed) => {
+      state = { ...state, clock: { ...state.clock, speed } };
+      refreshSpeed(state);
+      renderHud(state);
+    },
+  );
+
+  // ----- rAF ループ -----------------------------------------------------
+  let last = performance.now();
+  let hudAccum = 0;
+  const HUD_REFRESH_MS = 100; // HUD は 10fps で十分
+
+  function loop(now: number): void {
+    const delta = now - last;
+    last = now;
+    state = tick(state, delta, now);
+    hudAccum += delta;
+    if (hudAccum >= HUD_REFRESH_MS) {
+      hudAccum = 0;
+      renderHud(state);
+    }
+    requestAnimationFrame(loop);
+  }
+  requestAnimationFrame(loop);
 }
 
 bootstrap().catch((err: unknown) => {
