@@ -5,12 +5,16 @@ import {
   FERTILIZER_COST,
   FERTILIZER_DECAY_PER_DAY,
   FERTILIZER_GAIN,
+  GRADE_THRESHOLDS,
   GROWTH_STAGES,
   INITIAL_FERTILIZER,
   INITIAL_WATER,
   SEED_COST,
   STAGE_DAYS,
   WATER_DECAY_PER_DAY,
+  YIELD_MAX,
+  YIELD_MIN,
+  type Grade,
   type GrowthStage,
 } from "@/config/balance";
 import type { Farm, GameState, Greenhouse, Plot, TomatoPlant } from "@/game/state";
@@ -163,6 +167,79 @@ export function plantSeed(state: GameState, greenhouseId: string, plotId: string
 
 export function waterPlot(state: GameState, greenhouseId: string, plotId: string): ActionResult {
   return updatePlot(state, greenhouseId, plotId, (p) => ({ ...p, waterLevel: 100 }));
+}
+
+// ---------------------------------------------------------------------------
+// 収穫
+// ---------------------------------------------------------------------------
+
+export function gradeFor(careScore: number): Grade {
+  if (careScore >= GRADE_THRESHOLDS.S) return "S";
+  if (careScore >= GRADE_THRESHOLDS.A) return "A";
+  if (careScore >= GRADE_THRESHOLDS.B) return "B";
+  return "C";
+}
+
+/** careScore を 0..1 にマップして YIELD_MIN..YIELD_MAX を内挿. 1kg 単位に丸め. */
+export function yieldFor(careScore: number): number {
+  const ratio = clamp(careScore, 0, 100) / 100;
+  return Math.round(YIELD_MIN + (YIELD_MAX - YIELD_MIN) * ratio);
+}
+
+export type HarvestResult =
+  | { ok: true; state: GameState; grade: Grade; kg: number }
+  | {
+      ok: false;
+      reason:
+        | "no_such_greenhouse"
+        | "no_such_plot"
+        | "not_planted"
+        | "not_ready_to_harvest";
+    };
+
+export function harvestPlot(
+  state: GameState,
+  greenhouseId: string,
+  plotId: string,
+): HarvestResult {
+  const gh = state.farm.greenhouses.find((g) => g.id === greenhouseId);
+  if (!gh) return { ok: false, reason: "no_such_greenhouse" };
+  const plot = gh.plots.find((p) => p.id === plotId);
+  if (!plot) return { ok: false, reason: "no_such_plot" };
+  if (!plot.plant) return { ok: false, reason: "not_planted" };
+  if (plot.plant.stage !== "harvest") return { ok: false, reason: "not_ready_to_harvest" };
+
+  const grade = gradeFor(plot.plant.careScore);
+  const kg = yieldFor(plot.plant.careScore);
+
+  const newPlot: Plot = {
+    ...plot,
+    plant: undefined,
+    // 収穫後の土はやや乾燥した状態に
+    waterLevel: Math.min(plot.waterLevel, 30),
+    fertilizerLevel: Math.min(plot.fertilizerLevel, 20),
+  };
+  const newGh: Greenhouse = {
+    ...gh,
+    plots: gh.plots.map((p) => (p.id === plotId ? newPlot : p)),
+  };
+  const newInventory = {
+    ...state.farm.inventory,
+    [grade]: state.farm.inventory[grade] + kg,
+  };
+  return {
+    ok: true,
+    state: {
+      ...state,
+      farm: {
+        ...state.farm,
+        inventory: newInventory,
+        greenhouses: state.farm.greenhouses.map((g) => (g.id === greenhouseId ? newGh : g)),
+      },
+    },
+    grade,
+    kg,
+  };
 }
 
 export function fertilizePlot(

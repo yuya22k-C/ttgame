@@ -38,6 +38,20 @@
       </footer>
 
       <div id="toast" class="toast" role="status" aria-live="polite"></div>
+
+      <div id="shipping" class="modal" hidden>
+        <div class="modal-panel">
+          <header class="modal-header">
+            <h2>出荷</h2>
+            <button id="shipping-close" class="modal-close" aria-label="閉じる">×</button>
+          </header>
+          <div id="shipping-body" class="modal-body"></div>
+          <footer class="modal-footer">
+            <span id="shipping-total" class="modal-total">合計 ¥0</span>
+            <button id="shipping-ship-all" class="modal-primary">全部出荷</button>
+          </footer>
+        </div>
+      </div>
     </div>
 
     <script type="module" src="/src/main.ts"></script>

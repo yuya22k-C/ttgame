@@ -1,7 +1,13 @@
 // GameState — 要件定義 7.1 の中央オブジェクト.
 // M3 で Farm / Greenhouse を追加.
 
-import { GRID_H, GRID_W, INITIAL_CASH, type GrowthStage } from "@/config/balance";
+import {
+  GRID_H,
+  GRID_W,
+  INITIAL_CASH,
+  type Grade,
+  type GrowthStage,
+} from "@/config/balance";
 
 export type Season = "spring" | "summer" | "autumn" | "winter";
 
@@ -59,6 +65,8 @@ export interface Farm {
   width: number; // タイル単位
   height: number; // タイル単位
   greenhouses: Greenhouse[];
+  /** グレード別在庫 (kg). 出荷で減る. */
+  inventory: Record<Grade, number>;
 }
 
 export interface GameState {
@@ -84,6 +92,7 @@ export function createInitialState(): GameState {
       width: GRID_W,
       height: GRID_H,
       greenhouses: [],
+      inventory: { S: 0, A: 0, B: 0, C: 0 },
     },
     clock: {
       year: 1,

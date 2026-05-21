@@ -14,7 +14,7 @@ const PLOT_COLS = 3;
 const PLOT_ROWS = 2;
 const PLOT_GAP = 6;
 
-export type HouseAction = "plant" | "water" | "fertilize" | "close";
+export type HouseAction = "plant" | "water" | "fertilize" | "harvest" | "close";
 
 export interface HouseViewOpts {
   sprites: SpriteRegistry;
@@ -197,16 +197,18 @@ export class HouseView {
     this.actionsLayer.removeChildren();
     const plot = gh.plots.find((p) => p.id === this.selectedPlotId) ?? null;
     const planted = !!plot?.plant;
+    const ready = plot?.plant?.stage === "harvest";
 
     const buttons: { label: string; action: HouseAction; enabled: boolean }[] = [
       { label: "植える", action: "plant", enabled: !!plot && !planted },
       { label: "水やり", action: "water", enabled: !!plot && planted },
       { label: "追肥", action: "fertilize", enabled: !!plot && planted },
+      { label: "収穫", action: "harvest", enabled: !!plot && ready },
     ];
 
-    const btnW = 96;
+    const btnW = 80;
     const btnH = 36;
-    const gap = 12;
+    const gap = 10;
     const totalW = buttons.length * btnW + (buttons.length - 1) * gap;
     const x0 = (this.opts.viewWidth - totalW) / 2;
     const y = this.opts.viewHeight - FOOTER_H + 8;

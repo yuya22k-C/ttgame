@@ -8,14 +8,22 @@ import {
   TILE_SIZE,
 } from "@/config/balance";
 import { placeGreenhouse } from "@/game/farm";
+import { shipAll, shipGrade } from "@/game/shipping";
 import { createInitialState, type GameState, type Greenhouse } from "@/game/state";
 import { tick } from "@/game/tick";
-import { fertilizePlot, plantSeed, waterPlot } from "@/game/tomato";
+import { fertilizePlot, harvestPlot, plantSeed, waterPlot } from "@/game/tomato";
 import { FarmView } from "@/render/farmView";
 import { HouseView, type HouseAction } from "@/render/houseView";
 import { loadSprites } from "@/render/sprites";
 import { mountHud, renderHud } from "@/ui/hud";
 import { mountMenu, setBuildButtonActive } from "@/ui/menu";
+import {
+  hideShipping,
+  isShippingOpen,
+  mountShippingModal,
+  renderShipping,
+  showShipping,
+} from "@/ui/shipping";
 import { mountSpeedControls, refresh as refreshSpeed } from "@/ui/speed";
 import { showToast } from "@/ui/toast";
 
@@ -80,6 +88,34 @@ async function bootstrap(): Promise<void> {
   );
   mountMenu({
     build: () => toggleBuildMode(),
+    ship: () => {
+      showShipping(state);
+    },
+  });
+  mountShippingModal({
+    shipGrade: (grade) => {
+      const r = shipGrade(state, grade);
+      if (r.revenue === 0) {
+        showToast("在庫がありません");
+        return;
+      }
+      state = r.state;
+      renderHud(state);
+      renderShipping(state);
+      showToast(`グレード ${grade} を出荷 (+¥${r.revenue.toLocaleString("ja-JP")})`);
+    },
+    shipAll: () => {
+      const r = shipAll(state);
+      if (r.revenue === 0) {
+        showToast("在庫がありません");
+        return;
+      }
+      state = r.state;
+      renderHud(state);
+      renderShipping(state);
+      showToast(`全て出荷 (+¥${r.revenue.toLocaleString("ja-JP")})`);
+    },
+    close: () => hideShipping(),
   });
 
   function toggleBuildMode(): void {
@@ -142,6 +178,24 @@ async function bootstrap(): Promise<void> {
       showToast("プロットを選択してください");
       return;
     }
+    if (action === "harvest") {
+      const r = harvestPlot(state, openHouseId, plotId);
+      if (!r.ok) {
+        const msg =
+          r.reason === "not_ready_to_harvest"
+            ? "まだ収穫できません"
+            : r.reason === "not_planted"
+              ? "何も植えられていません"
+              : "操作できません";
+        showToast(msg);
+        return;
+      }
+      state = r.state;
+      renderHud(state);
+      refreshOpenHouse();
+      showToast(`収穫: ${r.grade} グレード ${r.kg}kg`);
+      return;
+    }
     let result;
     switch (action) {
       case "plant":
@@ -201,6 +255,9 @@ async function bootstrap(): Promise<void> {
     if (scene === "house" && houseAccum >= HOUSE_REFRESH_MS) {
       houseAccum = 0;
       refreshOpenHouse();
+    }
+    if (isShippingOpen() && hudAccum === 0) {
+      renderShipping(state);
     }
     requestAnimationFrame(loop);
   }

@@ -7,6 +7,7 @@ export type MenuAction = "build" | "grow" | "ship" | "status" | "settings";
 
 export interface MenuHandlers {
   build(): void;
+  ship(): void;
 }
 
 export function mountMenu(handlers: MenuHandlers): void {
@@ -19,8 +20,10 @@ export function mountMenu(handlers: MenuHandlers): void {
         case "build":
           handlers.build();
           break;
-        case "grow":
         case "ship":
+          handlers.ship();
+          break;
+        case "grow":
         case "status":
         case "settings":
           showToast(`${btn.textContent ?? action} は今後のマイルストーンで実装`);

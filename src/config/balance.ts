@@ -47,3 +47,27 @@ export const FERTILIZER_COST = 50;
 export const FERTILIZER_GAIN = 40;
 export const INITIAL_WATER = 60;
 export const INITIAL_FERTILIZER = 30;
+
+// ---- 収穫・出荷 (要件 4.3 / 4.4) ----------------------------------------
+export const GRADES = ["S", "A", "B", "C"] as const;
+export type Grade = (typeof GRADES)[number];
+
+/** グレード判定に使う careScore のしきい値 (含む). */
+export const GRADE_THRESHOLDS: Record<Grade, number> = {
+  S: 85,
+  A: 65,
+  B: 40,
+  C: 0,
+};
+
+/** グレード別の出荷単価 (円/kg). 要件 4.3. */
+export const GRADE_PRICE: Record<Grade, number> = {
+  S: 600,
+  A: 400,
+  B: 250,
+  C: 120,
+};
+
+/** 収穫量の最小/最大 (kg/区画). careScore で内挿. */
+export const YIELD_MIN = 3;
+export const YIELD_MAX = 6;

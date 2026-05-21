@@ -10,8 +10,11 @@ import { createInitialState, type GameState } from "../src/game/state";
 import {
   advancePlot,
   fertilizePlot,
+  gradeFor,
+  harvestPlot,
   plantSeed,
   waterPlot,
+  yieldFor,
 } from "../src/game/tomato";
 
 function setupWithGreenhouse(): { state: GameState; ghId: string; plotId: string } {
@@ -128,5 +131,82 @@ describe("advancePlot", () => {
     const plot = planted.state.farm.greenhouses[0]!.plots[0]!;
     expect(advancePlot(plot, 0)).toBe(plot);
     expect(advancePlot(plot, -1)).toBe(plot);
+  });
+});
+
+describe("gradeFor / yieldFor", () => {
+  it("maps careScore to grades", () => {
+    expect(gradeFor(95)).toBe("S");
+    expect(gradeFor(85)).toBe("S");
+    expect(gradeFor(70)).toBe("A");
+    expect(gradeFor(65)).toBe("A");
+    expect(gradeFor(50)).toBe("B");
+    expect(gradeFor(10)).toBe("C");
+  });
+
+  it("yieldFor stays within YIELD_MIN..YIELD_MAX", () => {
+    expect(yieldFor(0)).toBe(3);
+    expect(yieldFor(100)).toBe(6);
+    expect(yieldFor(50)).toBeGreaterThanOrEqual(3);
+    expect(yieldFor(50)).toBeLessThanOrEqual(6);
+  });
+});
+
+describe("harvestPlot", () => {
+  it("rejects when plant has not reached harvest stage", () => {
+    const { state, ghId, plotId } = setupWithGreenhouse();
+    const planted = plantSeed(state, ghId, plotId);
+    if (!planted.ok) throw new Error();
+    const r = harvestPlot(planted.state, ghId, plotId);
+    expect(r.ok).toBe(false);
+    if (r.ok) return;
+    expect(r.reason).toBe("not_ready_to_harvest");
+  });
+
+  it("rejects when plot has no plant", () => {
+    const { state, ghId, plotId } = setupWithGreenhouse();
+    const r = harvestPlot(state, ghId, plotId);
+    expect(r.ok).toBe(false);
+    if (r.ok) return;
+    expect(r.reason).toBe("not_planted");
+  });
+
+  it("harvests when stage reached and updates inventory + clears plant", () => {
+    const { state, ghId, plotId } = setupWithGreenhouse();
+    // 直接 harvest ステージの植物に書き換えてテスト
+    const gh = state.farm.greenhouses[0]!;
+    const plot = gh.plots[0]!;
+    const mutated: GameState = {
+      ...state,
+      farm: {
+        ...state.farm,
+        greenhouses: [
+          {
+            ...gh,
+            plots: gh.plots.map((p) =>
+              p.id === plot.id
+                ? {
+                    ...p,
+                    plant: {
+                      varietyId: "x",
+                      stage: "harvest",
+                      daysInStage: 0,
+                      careScore: 90, // S グレード狙い
+                    },
+                  }
+                : p,
+            ),
+          },
+        ],
+      },
+    };
+    const r = harvestPlot(mutated, ghId, plotId);
+    expect(r.ok).toBe(true);
+    if (!r.ok) return;
+    expect(r.grade).toBe("S");
+    expect(r.kg).toBeGreaterThan(0);
+    const after = r.state.farm.greenhouses[0]!.plots[0]!;
+    expect(after.plant).toBeUndefined();
+    expect(r.state.farm.inventory.S).toBe(r.kg);
   });
 });
