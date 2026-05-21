@@ -1,5 +1,7 @@
-// GameState — 要件定義 7.1 で定義した中央オブジェクト.
-// M1 では最小のフィールドのみ定義. 後続マイルストーンで拡張する.
+// GameState — 要件定義 7.1 の中央オブジェクト.
+// M3 で Farm / Greenhouse を追加.
+
+import { GRID_H, GRID_W, INITIAL_CASH } from "@/config/balance";
 
 export type Season = "spring" | "summer" | "autumn" | "winter";
 
@@ -27,10 +29,24 @@ export interface Player {
   skills: PlayerSkills;
 }
 
+export interface Greenhouse {
+  id: string;
+  position: { x: number; y: number }; // グリッド座標 (左上)
+  size: { w: number; h: number };
+  tier: number;
+}
+
+export interface Farm {
+  width: number; // タイル単位
+  height: number; // タイル単位
+  greenhouses: Greenhouse[];
+}
+
 export interface GameState {
-  version: number; // セーブスキーマバージョン (要件 7.2.3)
+  version: number;
   player: Player;
   cash: number;
+  farm: Farm;
   clock: Clock;
 }
 
@@ -44,7 +60,12 @@ export function createInitialState(): GameState {
       skillPoints: 0,
       skills: { cultivate: 1, business: 1, appraisal: 1 },
     },
-    cash: 50_000,
+    cash: INITIAL_CASH,
+    farm: {
+      width: GRID_W,
+      height: GRID_H,
+      greenhouses: [],
+    },
     clock: {
       year: 1,
       season: "spring",
