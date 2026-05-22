@@ -18,6 +18,9 @@ import {
   renderShipping,
   showShipping,
 } from "@/ui/shipping";
+import { decode, encode } from "@/save/codec";
+import { clearAuto, flushPendingSave, loadAuto, scheduleSave } from "@/save/storage";
+import { hideSettings, mountSettingsModal, showSettings } from "@/ui/settings";
 import { mountSpeedControls, refresh as refreshSpeed } from "@/ui/speed";
 import {
   hideStatus,
@@ -51,8 +54,17 @@ async function bootstrap(): Promise<void> {
 
   const sprites = await loadSprites();
 
-  let state: GameState = createInitialState();
-  state.clock.lastTickAt = performance.now();
+  // ---- セーブからロード or 新規開始 ------------------------------------
+  let state: GameState;
+  const loaded = loadAuto();
+  if (loaded.ok) {
+    state = loaded.state;
+    // 経過時間の暴走を避けるため lastTickAt は現在に揃える (オフライン進行は MVP では行わない)
+    state = { ...state, clock: { ...state.clock, lastTickAt: performance.now() } };
+  } else {
+    state = createInitialState();
+    state.clock.lastTickAt = performance.now();
+  }
   let buildMode = false;
   let scene: Scene = "farm";
   let openHouseId: string | null = null;
@@ -95,6 +107,39 @@ async function bootstrap(): Promise<void> {
     status: () => {
       showStatus(state);
     },
+    settings: () => {
+      showSettings();
+    },
+  });
+  mountSettingsModal({
+    export: () => encode(state),
+    import: (code) => {
+      const r = decode(code);
+      if (!r.ok) {
+        showToast(`インポート失敗: ${r.message}`);
+        return false;
+      }
+      state = { ...r.state, clock: { ...r.state.clock, lastTickAt: performance.now() } };
+      farmView.renderBuildings(state.farm);
+      farmView.renderOverlay(state);
+      renderHud(state);
+      scheduleSave(state, 0); // 即座に上書き
+      showToast(r.checksumOk ? "インポート完了" : "インポート完了 (整合性警告)");
+      return true;
+    },
+    reset: () => {
+      clearAuto();
+      state = createInitialState();
+      state.clock.lastTickAt = performance.now();
+      buildMode = false;
+      setBuildButtonActive(false);
+      farmView.renderBuildings(state.farm);
+      farmView.setBuildMode(false, state);
+      renderHud(state);
+      hideSettings();
+      showToast("新規ゲームを開始しました");
+    },
+    close: () => hideSettings(),
   });
   mountStatusModal({
     allocate: (skill) => {
@@ -263,14 +308,21 @@ async function bootstrap(): Promise<void> {
   let last = performance.now();
   let hudAccum = 0;
   let houseAccum = 0;
+  let saveAccum = 0;
   const HUD_REFRESH_MS = 100;
   const HOUSE_REFRESH_MS = 250;
+  const SAVE_INTERVAL_MS = 5000;
   function loop(now: number): void {
     const delta = now - last;
     last = now;
     state = tick(state, delta, now);
     hudAccum += delta;
     houseAccum += delta;
+    saveAccum += delta;
+    if (saveAccum >= SAVE_INTERVAL_MS) {
+      saveAccum = 0;
+      scheduleSave(state);
+    }
     if (hudAccum >= HUD_REFRESH_MS) {
       hudAccum = 0;
       renderHud(state);
@@ -288,6 +340,12 @@ async function bootstrap(): Promise<void> {
     requestAnimationFrame(loop);
   }
   requestAnimationFrame(loop);
+
+  // タブを閉じる/離れるときに最後のセーブを確実にする
+  window.addEventListener("beforeunload", () => flushPendingSave(state));
+  window.addEventListener("visibilitychange", () => {
+    if (document.visibilityState === "hidden") flushPendingSave(state);
+  });
 }
 
 function findGreenhouseAt(

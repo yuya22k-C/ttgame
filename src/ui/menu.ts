@@ -9,6 +9,7 @@ export interface MenuHandlers {
   build(): void;
   ship(): void;
   status(): void;
+  settings(): void;
 }
 
 export function mountMenu(handlers: MenuHandlers): void {
@@ -27,8 +28,10 @@ export function mountMenu(handlers: MenuHandlers): void {
         case "status":
           handlers.status();
           break;
-        case "grow":
         case "settings":
+          handlers.settings();
+          break;
+        case "grow":
           showToast(`${btn.textContent ?? action} は今後のマイルストーンで実装`);
           break;
       }

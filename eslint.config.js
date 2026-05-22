@@ -20,6 +20,7 @@ export default [
         HTMLElement: "readonly",
         HTMLCanvasElement: "readonly",
         HTMLButtonElement: "readonly",
+        HTMLTextAreaElement: "readonly",
         Element: "readonly",
         navigator: "readonly",
       },

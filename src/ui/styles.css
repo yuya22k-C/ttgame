@@ -391,6 +391,54 @@ body {
   cursor: not-allowed;
 }
 
+/* ---- Settings modal ------------------------------------------------ */
+.settings-section {
+  padding: 12px 14px;
+  border-bottom: 1px solid #1a1620;
+}
+
+.settings-section:last-child {
+  border-bottom: 0;
+}
+
+.settings-section h3 {
+  font-size: 0.95em;
+  margin: 0 0 6px;
+  color: var(--accent);
+}
+
+.settings-note {
+  font-size: 0.82em;
+  opacity: 0.8;
+  margin: 0 0 10px;
+  line-height: 1.4;
+}
+
+.settings-textarea {
+  width: 100%;
+  padding: 8px;
+  font-family: ui-monospace, "SFMono-Regular", Menlo, Consolas, monospace;
+  font-size: 0.78em;
+  background: #1a1620;
+  color: var(--hud-fg);
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  resize: vertical;
+  word-break: break-all;
+}
+
+.settings-buttons {
+  display: flex;
+  gap: 8px;
+  margin-top: 8px;
+  flex-wrap: wrap;
+}
+
+.settings-danger {
+  background: #6a2a30;
+  color: #fff8e0;
+}
+
 /* ---- Exp bar in HUD -------------------------------------------------- */
 .exp-bar-wrap {
   position: relative;

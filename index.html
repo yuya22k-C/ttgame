@@ -42,6 +42,42 @@
 
       <div id="toast" class="toast" role="status" aria-live="polite"></div>
 
+      <div id="settings" class="modal" hidden>
+        <div class="modal-panel">
+          <header class="modal-header">
+            <h2>設定</h2>
+            <button id="settings-close" class="modal-close" aria-label="閉じる">×</button>
+          </header>
+          <div class="modal-body">
+            <section class="settings-section">
+              <h3>セーブの持ち運び</h3>
+              <p class="settings-note">
+                コードをコピーして別端末や別ブラウザに貼り付けると、続きから遊べます。
+              </p>
+              <textarea
+                id="settings-code"
+                class="settings-textarea"
+                rows="4"
+                spellcheck="false"
+                placeholder="ここにコードが表示されます"
+              ></textarea>
+              <div class="settings-buttons">
+                <button id="settings-export" class="modal-primary">エクスポート</button>
+                <button id="settings-copy" class="ship-btn">コピー</button>
+                <button id="settings-import" class="ship-btn">インポート</button>
+              </div>
+            </section>
+            <section class="settings-section">
+              <h3>新規開始</h3>
+              <p class="settings-note">
+                現在の進行を破棄して最初からやり直します。
+              </p>
+              <button id="settings-reset" class="ship-btn settings-danger">最初からやり直す</button>
+            </section>
+          </div>
+        </div>
+      </div>
+
       <div id="status" class="modal" hidden>
         <div class="modal-panel">
           <header class="modal-header">
