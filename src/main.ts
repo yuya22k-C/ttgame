@@ -1,6 +1,12 @@
 import { Application, Container } from "pixi.js";
 import { FERTILIZER_COST, GRID_H, GRID_W, TILE_SIZE } from "@/config/balance";
 import { effectiveGreenhouseCost, placeGreenhouse } from "@/game/farm";
+import {
+  createCenter,
+  detectEvents,
+  pushLevelUp,
+  type NotificationCenter,
+} from "@/game/notifications";
 import { allocateSkill } from "@/game/player";
 import { shipAll, shipGrade } from "@/game/shipping";
 import { createInitialState, type GameState, type Greenhouse } from "@/game/state";
@@ -20,6 +26,7 @@ import {
 } from "@/ui/shipping";
 import { decode, encode } from "@/save/codec";
 import { clearAuto, flushPendingSave, loadAuto, scheduleSave } from "@/save/storage";
+import { mountBell, refreshBadge } from "@/ui/bell";
 import { hideSettings, mountSettingsModal, showSettings } from "@/ui/settings";
 import { mountSpeedControls, refresh as refreshSpeed } from "@/ui/speed";
 import {
@@ -68,6 +75,7 @@ async function bootstrap(): Promise<void> {
   let buildMode = false;
   let scene: Scene = "farm";
   let openHouseId: string | null = null;
+  const center: NotificationCenter = createCenter();
 
   // ---- Pixi シーン構成 ------------------------------------------------
   const root = new Container();
@@ -77,7 +85,10 @@ async function bootstrap(): Promise<void> {
     onCellClick: (gx, gy) => handleFarmCellClick(gx, gy),
   });
   root.addChild(farmView.root);
-  farmView.renderBuildings(state.farm);
+  farmView.renderBuildings(state.farm, state);
+
+  mountBell(() => center);
+  refreshBadge(center);
 
   const houseView = new HouseView({
     sprites,
@@ -120,7 +131,7 @@ async function bootstrap(): Promise<void> {
         return false;
       }
       state = { ...r.state, clock: { ...r.state.clock, lastTickAt: performance.now() } };
-      farmView.renderBuildings(state.farm);
+      farmView.renderBuildings(state.farm, state);
       farmView.renderOverlay(state);
       renderHud(state);
       scheduleSave(state, 0); // 即座に上書き
@@ -133,7 +144,7 @@ async function bootstrap(): Promise<void> {
       state.clock.lastTickAt = performance.now();
       buildMode = false;
       setBuildButtonActive(false);
-      farmView.renderBuildings(state.farm);
+      farmView.renderBuildings(state.farm, state);
       farmView.setBuildMode(false, state);
       renderHud(state);
       hideSettings();
@@ -206,7 +217,7 @@ async function bootstrap(): Promise<void> {
       }
       const cost = state.cash - result.state.cash;
       state = result.state;
-      farmView.renderBuildings(state.farm);
+      farmView.renderBuildings(state.farm, state);
       farmView.renderOverlay(state);
       renderHud(state);
       showToast(`ハウスを建設しました (-¥${cost.toLocaleString("ja-JP")})`);
@@ -259,6 +270,8 @@ async function bootstrap(): Promise<void> {
       refreshOpenHouse();
       showToast(`収穫: ${r.grade} ${r.kg}kg (+${r.expGained} EXP)`);
       if (r.levelsGained > 0) {
+        pushLevelUp(center, state.player.level, Date.now());
+        refreshBadge(center);
         showToast(`レベルアップ! Lv ${state.player.level} (+${r.levelsGained} SP)`, 2400);
       }
       return;
@@ -304,14 +317,33 @@ async function bootstrap(): Promise<void> {
     if (gh) houseView.refresh(gh);
   }
 
+  // 注意ドットの再描画は状態が変わったときだけにする (重い描画を避けるため)
+  let lastAttentionSig = "";
+  function attentionSig(s: GameState): string {
+    let acc = "";
+    for (const gh of s.farm.greenhouses) {
+      let urgent = "n";
+      for (const p of gh.plots) {
+        if (!p.plant) continue;
+        if (p.plant.stage === "harvest") { urgent = "h"; break; }
+        if (p.waterLevel < 15) urgent = "w";
+        else if (p.fertilizerLevel < 10 && urgent === "n") urgent = "f";
+      }
+      acc += `${gh.id}=${urgent};`;
+    }
+    return acc;
+  }
+
   // ---- rAF ループ -----------------------------------------------------
   let last = performance.now();
   let hudAccum = 0;
   let houseAccum = 0;
   let saveAccum = 0;
+  let notifAccum = 0;
   const HUD_REFRESH_MS = 100;
   const HOUSE_REFRESH_MS = 250;
   const SAVE_INTERVAL_MS = 5000;
+  const NOTIF_INTERVAL_MS = 1000;
   function loop(now: number): void {
     const delta = now - last;
     last = now;
@@ -319,9 +351,21 @@ async function bootstrap(): Promise<void> {
     hudAccum += delta;
     houseAccum += delta;
     saveAccum += delta;
+    notifAccum += delta;
     if (saveAccum >= SAVE_INTERVAL_MS) {
       saveAccum = 0;
       scheduleSave(state);
+    }
+    if (notifAccum >= NOTIF_INTERVAL_MS) {
+      notifAccum = 0;
+      detectEvents(center, state, Date.now());
+      refreshBadge(center);
+      // 農園マップの注意ドットを差分があれば再描画
+      const sig = attentionSig(state);
+      if (sig !== lastAttentionSig) {
+        lastAttentionSig = sig;
+        if (scene === "farm") farmView.renderBuildings(state.farm, state);
+      }
     }
     if (hudAccum >= HUD_REFRESH_MS) {
       hudAccum = 0;

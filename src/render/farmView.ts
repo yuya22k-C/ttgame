@@ -4,6 +4,7 @@
 import { Container, Graphics, Sprite } from "pixi.js";
 import { GREENHOUSE_SIZE, GRID_H, GRID_W, TILE_SIZE } from "@/config/balance";
 import { canPlaceGreenhouse } from "@/game/farm";
+import { greenhouseAttention } from "@/game/notifications";
 import type { Farm, GameState } from "@/game/state";
 import type { SpriteRegistry } from "@/render/sprites";
 
@@ -52,13 +53,26 @@ export class FarmView {
   }
 
   /** ハウス群を State に合わせて再描画 (差分ではなく全置換). */
-  renderBuildings(farm: Farm): void {
+  renderBuildings(farm: Farm, state?: GameState): void {
     this.buildings.removeChildren();
     for (const gh of farm.greenhouses) {
       const sprite = new Sprite(this.opts.sprites.greenhouse);
       sprite.x = gh.position.x * TILE_SIZE;
       sprite.y = gh.position.y * TILE_SIZE;
       this.buildings.addChild(sprite);
+
+      // 注意ドット (収穫期 = 緑 / 水・肥料切れ = 黄)
+      if (state) {
+        const att = greenhouseAttention(state, gh.id);
+        if (att !== "none") {
+          const dot = new Graphics();
+          const cx = gh.position.x * TILE_SIZE + gh.size.w * TILE_SIZE - 8;
+          const cy = gh.position.y * TILE_SIZE + 6;
+          const color = att === "info" ? 0x6fd86b : 0xd8b04a;
+          dot.circle(cx, cy, 5).fill({ color }).stroke({ color: 0x1a1620, width: 1 });
+          this.buildings.addChild(dot);
+        }
+      }
     }
   }
 

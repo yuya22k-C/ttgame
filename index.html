@@ -18,6 +18,10 @@
           <span id="hud-date" class="hud-value">--年 春 1日 06:00</span>
         </div>
         <div class="hud-right">
+          <button id="bell" class="bell-btn" aria-label="通知">
+            <span class="bell-icon">!</span>
+            <span id="bell-count" class="bell-badge" hidden>0</span>
+          </button>
           <span class="hud-label">Lv</span>
           <span id="hud-level" class="hud-value">1</span>
           <div class="exp-bar-wrap" aria-label="経験値">
@@ -25,6 +29,8 @@
           </div>
         </div>
       </header>
+
+      <div id="bell-list" class="bell-list" hidden></div>
 
       <div id="speed" class="speed-bar" aria-label="ゲーム速度"></div>
 

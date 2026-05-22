@@ -439,6 +439,107 @@ body {
   color: #fff8e0;
 }
 
+/* ---- Bell (通知) -------------------------------------------------- */
+.bell-btn {
+  position: relative;
+  width: 30px;
+  height: 28px;
+  padding: 0;
+  margin-right: 6px;
+  background: #3a3340;
+  color: var(--hud-fg);
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  font-weight: 700;
+  cursor: pointer;
+  font-family: inherit;
+}
+
+.bell-icon {
+  font-size: 0.95em;
+}
+
+.bell-badge {
+  position: absolute;
+  top: -6px;
+  right: -6px;
+  min-width: 16px;
+  height: 16px;
+  background: #d83d3d;
+  color: #fff;
+  font-size: 0.7em;
+  font-weight: 700;
+  border-radius: 8px;
+  padding: 0 4px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.bell-badge[hidden] {
+  display: none;
+}
+
+.bell-list {
+  position: absolute;
+  top: 44px;
+  right: 8px;
+  width: 280px;
+  max-height: 60vh;
+  overflow-y: auto;
+  background: #2a2630;
+  border: 2px solid var(--border);
+  border-radius: 6px;
+  z-index: 60;
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.4);
+}
+
+.bell-list[hidden] {
+  display: none;
+}
+
+.bell-list-empty {
+  padding: 18px 12px;
+  text-align: center;
+  font-size: 0.85em;
+  opacity: 0.6;
+}
+
+.bell-item {
+  display: grid;
+  grid-template-columns: 8px 1fr auto;
+  gap: 8px;
+  align-items: center;
+  padding: 8px 10px;
+  border-bottom: 1px solid #1a1620;
+}
+
+.bell-item--unread {
+  background: rgba(240, 196, 64, 0.07);
+}
+
+.bell-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+}
+
+.bell-dot--harvest_ready { background: #6fd86b; }
+.bell-dot--water_low { background: #4aa8e0; }
+.bell-dot--fert_low { background: #d8b04a; }
+.bell-dot--cash_zero { background: #d83d3d; }
+.bell-dot--level_up { background: #f0c440; }
+
+.bell-msg {
+  font-size: 0.85em;
+}
+
+.bell-time {
+  font-size: 0.7em;
+  opacity: 0.6;
+  font-variant-numeric: tabular-nums;
+}
+
 /* ---- Exp bar in HUD -------------------------------------------------- */
 .exp-bar-wrap {
   position: relative;
