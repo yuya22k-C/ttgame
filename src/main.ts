@@ -63,6 +63,7 @@ async function bootstrap(): Promise<void> {
 
   // ---- セーブからロード or 新規開始 ------------------------------------
   let state: GameState;
+  let isFreshStart = false;
   const loaded = loadAuto();
   if (loaded.ok) {
     state = loaded.state;
@@ -71,6 +72,7 @@ async function bootstrap(): Promise<void> {
   } else {
     state = createInitialState();
     state.clock.lastTickAt = performance.now();
+    isFreshStart = true;
   }
   let buildMode = false;
   let scene: Scene = "farm";
@@ -241,6 +243,8 @@ async function bootstrap(): Promise<void> {
     openHouseId = null;
     houseView.setVisible(false);
     farmView.root.visible = true;
+    // ハウスを開いている間に注意状態が変わった可能性があるので再描画
+    farmView.renderBuildings(state.farm, state);
   }
 
   function handleHouseAction(action: HouseAction, plotId: string | null): void {
@@ -390,6 +394,11 @@ async function bootstrap(): Promise<void> {
   window.addEventListener("visibilitychange", () => {
     if (document.visibilityState === "hidden") flushPendingSave(state);
   });
+
+  // 新規プレイヤー向けの導入トースト
+  if (isFreshStart) {
+    setTimeout(() => showToast("「建てる」でビニールハウスを設置しましょう", 3500), 600);
+  }
 }
 
 function findGreenhouseAt(

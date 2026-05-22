@@ -14,6 +14,8 @@
   box-sizing: border-box;
   margin: 0;
   padding: 0;
+  /* ダブルタップによるブラウザ拡大を抑制 (ゲームの操作優先) */
+  touch-action: manipulation;
 }
 
 html,
@@ -29,6 +31,14 @@ body {
   -webkit-user-select: none;
   -webkit-tap-highlight-color: transparent;
   overflow: hidden;
+  /* iOS でフォントが自動拡大されるのを防ぐ */
+  -webkit-text-size-adjust: 100%;
+  text-size-adjust: 100%;
+  /* セーフエリア (ノッチ等) に対応 */
+  padding: env(safe-area-inset-top) env(safe-area-inset-right) env(safe-area-inset-bottom)
+    env(safe-area-inset-left);
+  /* オーバースクロールでページが動くのを防ぐ */
+  overscroll-behavior: none;
 }
 
 #app {
@@ -45,8 +55,34 @@ body {
   align-items: center;
   background: var(--hud-bg);
   border-bottom: 2px solid var(--border);
-  padding: 8px 12px;
+  padding: 8px 10px;
   font-weight: 600;
+  gap: 6px;
+  flex-wrap: nowrap;
+}
+
+.hud-left,
+.hud-center,
+.hud-right {
+  flex-shrink: 1;
+  min-width: 0;
+}
+
+.hud-center {
+  flex-shrink: 1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+@media (max-width: 360px) {
+  .hud {
+    font-size: 0.9em;
+    padding: 6px 8px;
+  }
+  .hud .exp-bar-wrap {
+    width: 36px;
+  }
 }
 
 .hud-left,
@@ -79,7 +115,8 @@ body {
 }
 
 .speed-btn {
-  min-width: 36px;
+  min-width: 44px;
+  min-height: 32px;
   padding: 4px 10px;
   font-size: 0.85em;
   font-weight: 700;
@@ -114,8 +151,13 @@ body {
 .stage canvas {
   image-rendering: pixelated;
   image-rendering: crisp-edges;
+  /* 縦持ち優先で画面いっぱいに拡縮 (ピクセル等倍を諦めて目的の比率を維持) */
+  width: auto;
+  height: auto;
   max-width: 100%;
   max-height: 100%;
+  /* タッチで誤ってスクロールしないように */
+  touch-action: none;
 }
 
 /* ---- Menu (下部操作ボタン) ------------------------------------------ */
@@ -129,8 +171,9 @@ body {
 
 .menu-btn {
   flex: 1;
-  padding: 10px 6px;
-  font-size: 0.95em;
+  padding: 10px 4px;
+  min-height: 44px; /* iOS HIG 推奨タップ領域 */
+  font-size: 0.9em;
   font-weight: 700;
   color: var(--hud-fg);
   background: var(--menu-btn);
@@ -138,6 +181,14 @@ body {
   border-radius: 4px;
   cursor: pointer;
   font-family: inherit;
+  white-space: nowrap;
+}
+
+@media (max-width: 360px) {
+  .menu-btn {
+    font-size: 0.78em;
+    padding: 8px 2px;
+  }
 }
 
 .menu-btn:active {
@@ -184,7 +235,10 @@ body {
   align-items: center;
   justify-content: center;
   z-index: 100;
-  padding: 16px;
+  padding: 12px;
+  /* セーフエリア対応 */
+  padding-top: max(12px, env(safe-area-inset-top));
+  padding-bottom: max(12px, env(safe-area-inset-bottom));
 }
 
 .modal[hidden] {
@@ -225,7 +279,12 @@ body {
   font-size: 1.4em;
   cursor: pointer;
   line-height: 1;
-  padding: 0 6px;
+  /* 最低 44×44 のタップ領域確保 */
+  min-width: 44px;
+  min-height: 44px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
 }
 
 .modal-body {
@@ -373,8 +432,8 @@ body {
 }
 
 .skill-plus {
-  width: 32px;
-  height: 32px;
+  width: 44px;
+  height: 44px;
   padding: 0;
   font-size: 1.2em;
   font-weight: 700;
@@ -483,8 +542,9 @@ body {
 .bell-list {
   position: absolute;
   top: 44px;
-  right: 8px;
+  right: 4px;
   width: 280px;
+  max-width: calc(100vw - 8px);
   max-height: 60vh;
   overflow-y: auto;
   background: #2a2630;

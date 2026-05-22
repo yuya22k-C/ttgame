@@ -17,6 +17,8 @@ export default [
         cancelAnimationFrame: "readonly",
         localStorage: "readonly",
         performance: "readonly",
+        setTimeout: "readonly",
+        clearTimeout: "readonly",
         HTMLElement: "readonly",
         HTMLCanvasElement: "readonly",
         HTMLButtonElement: "readonly",
