@@ -1,17 +1,11 @@
 import { Application, Container } from "pixi.js";
-import {
-  FERTILIZER_COST,
-  GREENHOUSE_COST,
-  GRID_H,
-  GRID_W,
-  SEED_COST,
-  TILE_SIZE,
-} from "@/config/balance";
-import { placeGreenhouse } from "@/game/farm";
+import { FERTILIZER_COST, GRID_H, GRID_W, TILE_SIZE } from "@/config/balance";
+import { effectiveGreenhouseCost, placeGreenhouse } from "@/game/farm";
+import { allocateSkill } from "@/game/player";
 import { shipAll, shipGrade } from "@/game/shipping";
 import { createInitialState, type GameState, type Greenhouse } from "@/game/state";
 import { tick } from "@/game/tick";
-import { fertilizePlot, harvestPlot, plantSeed, waterPlot } from "@/game/tomato";
+import { effectiveSeedCost, fertilizePlot, harvestPlot, plantSeed, waterPlot } from "@/game/tomato";
 import { FarmView } from "@/render/farmView";
 import { HouseView, type HouseAction } from "@/render/houseView";
 import { loadSprites } from "@/render/sprites";
@@ -25,6 +19,13 @@ import {
   showShipping,
 } from "@/ui/shipping";
 import { mountSpeedControls, refresh as refreshSpeed } from "@/ui/speed";
+import {
+  hideStatus,
+  isStatusOpen,
+  mountStatusModal,
+  renderStatus,
+  showStatus,
+} from "@/ui/status";
 import { showToast } from "@/ui/toast";
 
 type Scene = "farm" | "house";
@@ -91,6 +92,22 @@ async function bootstrap(): Promise<void> {
     ship: () => {
       showShipping(state);
     },
+    status: () => {
+      showStatus(state);
+    },
+  });
+  mountStatusModal({
+    allocate: (skill) => {
+      const r = allocateSkill(state.player, skill);
+      if (!r.ok) {
+        showToast("スキルポイントがありません");
+        return;
+      }
+      state = { ...state, player: r.player };
+      renderStatus(state);
+      renderHud(state);
+    },
+    close: () => hideStatus(),
   });
   mountShippingModal({
     shipGrade: (grade) => {
@@ -124,7 +141,8 @@ async function bootstrap(): Promise<void> {
     setBuildButtonActive(buildMode);
     farmView.setBuildMode(buildMode, state);
     if (buildMode) {
-      showToast(`空きマスをタップして配置 (¥${GREENHOUSE_COST.toLocaleString("ja-JP")})`);
+      const cost = effectiveGreenhouseCost(state);
+      showToast(`空きマスをタップして配置 (¥${cost.toLocaleString("ja-JP")})`);
     }
   }
 
@@ -141,11 +159,12 @@ async function bootstrap(): Promise<void> {
         showToast(msg);
         return;
       }
+      const cost = state.cash - result.state.cash;
       state = result.state;
       farmView.renderBuildings(state.farm);
       farmView.renderOverlay(state);
       renderHud(state);
-      showToast(`ハウスを建設しました (-¥${GREENHOUSE_COST.toLocaleString("ja-JP")})`);
+      showToast(`ハウスを建設しました (-¥${cost.toLocaleString("ja-JP")})`);
       return;
     }
 
@@ -193,7 +212,10 @@ async function bootstrap(): Promise<void> {
       state = r.state;
       renderHud(state);
       refreshOpenHouse();
-      showToast(`収穫: ${r.grade} グレード ${r.kg}kg`);
+      showToast(`収穫: ${r.grade} ${r.kg}kg (+${r.expGained} EXP)`);
+      if (r.levelsGained > 0) {
+        showToast(`レベルアップ! Lv ${state.player.level} (+${r.levelsGained} SP)`, 2400);
+      }
       return;
     }
     let result;
@@ -224,7 +246,8 @@ async function bootstrap(): Promise<void> {
     renderHud(state);
     refreshOpenHouse();
     if (action === "plant") {
-      showToast(`種を撒きました (-¥${SEED_COST})`);
+      const cost = effectiveSeedCost(state);
+      showToast(`種を撒きました (-¥${cost})`);
     } else if (action === "fertilize") {
       showToast(`追肥しました (-¥${FERTILIZER_COST})`);
     }
@@ -258,6 +281,9 @@ async function bootstrap(): Promise<void> {
     }
     if (isShippingOpen() && hudAccum === 0) {
       renderShipping(state);
+    }
+    if (isStatusOpen() && hudAccum === 0) {
+      renderStatus(state);
     }
     requestAnimationFrame(loop);
   }

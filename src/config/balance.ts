@@ -71,3 +71,30 @@ export const GRADE_PRICE: Record<Grade, number> = {
 /** 収穫量の最小/最大 (kg/区画). careScore で内挿. */
 export const YIELD_MIN = 3;
 export const YIELD_MAX = 6;
+
+// ---- プレイヤー成長 (要件 4.6) ------------------------------------------
+/** レベル N から N+1 に必要な EXP. ⌊100 × N^1.5⌋. */
+export function expForNextLevel(level: number): number {
+  return Math.floor(100 * Math.pow(level, 1.5));
+}
+
+/** 収穫時に獲得する EXP. base = 10 EXP/kg + グレードボーナス. */
+export const EXP_PER_KG = 10;
+export const EXP_GRADE_BONUS: Record<Grade, number> = {
+  S: 20,
+  A: 10,
+  B: 5,
+  C: 0,
+};
+
+// ---- スキル係数 ---------------------------------------------------------
+/** 栽培スキル: 収穫時に careScore を底上げする値 (level-1) × n. */
+export const SKILL_CULTIVATE_CARE_PER_LEVEL = 5;
+/** 経営スキル: 出荷単価の倍率 = 1 + (level-1) × n. */
+export const SKILL_BUSINESS_PRICE_PER_LEVEL = 0.05;
+/** 経営スキル: 建設コストの割引率 (level-1) × n. */
+export const SKILL_BUSINESS_BUILD_DISCOUNT_PER_LEVEL = 0.03;
+/** 目利きスキル: 種苗コストの割引率 (level-1) × n. */
+export const SKILL_APPRAISAL_SEED_DISCOUNT_PER_LEVEL = 0.02;
+/** 目利きスキル: 植え付け時の初期 careScore ボーナス (level-1) × n. */
+export const SKILL_APPRAISAL_INITIAL_CARE_PER_LEVEL = 5;

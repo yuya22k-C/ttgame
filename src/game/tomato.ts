@@ -2,6 +2,8 @@
 // 生育ステージ進行 / 水・肥料の自然減衰 / プレイヤー操作 (植える/水やる/追肥/収穫).
 
 import {
+  EXP_GRADE_BONUS,
+  EXP_PER_KG,
   FERTILIZER_COST,
   FERTILIZER_DECAY_PER_DAY,
   FERTILIZER_GAIN,
@@ -10,6 +12,9 @@ import {
   INITIAL_FERTILIZER,
   INITIAL_WATER,
   SEED_COST,
+  SKILL_APPRAISAL_INITIAL_CARE_PER_LEVEL,
+  SKILL_APPRAISAL_SEED_DISCOUNT_PER_LEVEL,
+  SKILL_CULTIVATE_CARE_PER_LEVEL,
   STAGE_DAYS,
   WATER_DECAY_PER_DAY,
   YIELD_MAX,
@@ -17,6 +22,7 @@ import {
   type Grade,
   type GrowthStage,
 } from "@/config/balance";
+import { gainExp } from "@/game/player";
 import type { Farm, GameState, Greenhouse, Plot, TomatoPlant } from "@/game/state";
 
 const DEFAULT_VARIETY = "akanemaru"; // 仮称: 架空品種「アカネ丸」 (要件 5.3)
@@ -141,19 +147,35 @@ function updatePlot(
   };
 }
 
+export function effectiveSeedCost(state: GameState): number {
+  const lvl = Math.max(1, state.player.skills.appraisal);
+  const discount = (lvl - 1) * SKILL_APPRAISAL_SEED_DISCOUNT_PER_LEVEL;
+  return Math.max(0, Math.round(SEED_COST * (1 - discount)));
+}
+
 export function plantSeed(state: GameState, greenhouseId: string, plotId: string): ActionResult {
   const gh = state.farm.greenhouses.find((g) => g.id === greenhouseId);
   if (!gh) return { ok: false, reason: "no_such_greenhouse" };
   const plot = gh.plots.find((p) => p.id === plotId);
   if (!plot) return { ok: false, reason: "no_such_plot" };
   if (plot.plant) return { ok: false, reason: "already_planted" };
-  if (state.cash < SEED_COST) return { ok: false, reason: "not_enough_cash" };
+
+  const cost = effectiveSeedCost(state);
+  if (state.cash < cost) return { ok: false, reason: "not_enough_cash" };
+
+  // 目利きスキル: 初期 careScore に上乗せ
+  const appraisalLvl = Math.max(1, state.player.skills.appraisal);
+  const initialCare = clamp(
+    60 + (appraisalLvl - 1) * SKILL_APPRAISAL_INITIAL_CARE_PER_LEVEL,
+    0,
+    100,
+  );
 
   const newPlant: TomatoPlant = {
     varietyId: DEFAULT_VARIETY,
     stage: "seed",
     daysInStage: 0,
-    careScore: 60,
+    careScore: initialCare,
   };
   const updated = updatePlot(state, greenhouseId, plotId, (p) => ({
     ...p,
@@ -162,7 +184,7 @@ export function plantSeed(state: GameState, greenhouseId: string, plotId: string
     fertilizerLevel: Math.max(p.fertilizerLevel, INITIAL_FERTILIZER),
   }));
   if (!updated.ok) return updated;
-  return { ok: true, state: { ...updated.state, cash: updated.state.cash - SEED_COST } };
+  return { ok: true, state: { ...updated.state, cash: updated.state.cash - cost } };
 }
 
 export function waterPlot(state: GameState, greenhouseId: string, plotId: string): ActionResult {
@@ -187,7 +209,7 @@ export function yieldFor(careScore: number): number {
 }
 
 export type HarvestResult =
-  | { ok: true; state: GameState; grade: Grade; kg: number }
+  | { ok: true; state: GameState; grade: Grade; kg: number; expGained: number; levelsGained: number }
   | {
       ok: false;
       reason:
@@ -209,8 +231,13 @@ export function harvestPlot(
   if (!plot.plant) return { ok: false, reason: "not_planted" };
   if (plot.plant.stage !== "harvest") return { ok: false, reason: "not_ready_to_harvest" };
 
-  const grade = gradeFor(plot.plant.careScore);
-  const kg = yieldFor(plot.plant.careScore);
+  // 栽培スキルによる careScore ボーナス
+  const cultivateLvl = Math.max(1, state.player.skills.cultivate);
+  const careBoost = (cultivateLvl - 1) * SKILL_CULTIVATE_CARE_PER_LEVEL;
+  const effectiveCare = clamp(plot.plant.careScore + careBoost, 0, 100);
+
+  const grade = gradeFor(effectiveCare);
+  const kg = yieldFor(effectiveCare);
 
   const newPlot: Plot = {
     ...plot,
@@ -227,10 +254,16 @@ export function harvestPlot(
     ...state.farm.inventory,
     [grade]: state.farm.inventory[grade] + kg,
   };
+
+  // 経験値獲得 + レベルアップ判定
+  const expGained = kg * EXP_PER_KG + EXP_GRADE_BONUS[grade];
+  const expResult = gainExp(state.player, expGained);
+
   return {
     ok: true,
     state: {
       ...state,
+      player: expResult.player,
       farm: {
         ...state.farm,
         inventory: newInventory,
@@ -239,6 +272,8 @@ export function harvestPlot(
     },
     grade,
     kg,
+    expGained,
+    levelsGained: expResult.levelsGained,
   };
 }
 

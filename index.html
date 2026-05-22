@@ -20,6 +20,9 @@
         <div class="hud-right">
           <span class="hud-label">Lv</span>
           <span id="hud-level" class="hud-value">1</span>
+          <div class="exp-bar-wrap" aria-label="経験値">
+            <div id="hud-exp-bar" class="exp-bar"></div>
+          </div>
         </div>
       </header>
 
@@ -38,6 +41,20 @@
       </footer>
 
       <div id="toast" class="toast" role="status" aria-live="polite"></div>
+
+      <div id="status" class="modal" hidden>
+        <div class="modal-panel">
+          <header class="modal-header">
+            <h2>農園主ステータス</h2>
+            <button id="status-close" class="modal-close" aria-label="閉じる">×</button>
+          </header>
+          <div id="status-body" class="modal-body"></div>
+          <footer class="modal-footer">
+            <span id="status-points" class="modal-total">SP 0</span>
+            <span style="font-size:0.85em;opacity:0.75;">レベルアップで +1 SP</span>
+          </footer>
+        </div>
+      </div>
 
       <div id="shipping" class="modal" hidden>
         <div class="modal-panel">

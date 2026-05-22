@@ -5,9 +5,16 @@ import {
   GREENHOUSE_COST,
   GREENHOUSE_SIZE,
   PLOTS_PER_GREENHOUSE,
+  SKILL_BUSINESS_BUILD_DISCOUNT_PER_LEVEL,
 } from "@/config/balance";
 import type { Farm, GameState, Greenhouse, Plot } from "@/game/state";
 import { nextId } from "@/util/id";
+
+export function effectiveGreenhouseCost(state: GameState): number {
+  const lvl = Math.max(1, state.player.skills.business);
+  const discount = (lvl - 1) * SKILL_BUSINESS_BUILD_DISCOUNT_PER_LEVEL;
+  return Math.max(0, Math.round(GREENHOUSE_COST * (1 - discount)));
+}
 
 function createEmptyPlots(count: number): Plot[] {
   const plots: Plot[] = [];
@@ -63,7 +70,8 @@ export function placeGreenhouse(state: GameState, gx: number, gy: number): Place
       return { ok: false, reason: "overlap" };
     }
   }
-  if (state.cash < GREENHOUSE_COST) {
+  const cost = effectiveGreenhouseCost(state);
+  if (state.cash < cost) {
     return { ok: false, reason: "not_enough_cash" };
   }
   const greenhouse: Greenhouse = {
@@ -75,7 +83,7 @@ export function placeGreenhouse(state: GameState, gx: number, gy: number): Place
   };
   const nextState: GameState = {
     ...state,
-    cash: state.cash - GREENHOUSE_COST,
+    cash: state.cash - cost,
     farm: {
       ...state.farm,
       greenhouses: [...state.farm.greenhouses, greenhouse],
